@@ -278,22 +278,30 @@ type
     property Command: String read GetCommand write SetCommand;
   end;
 
-(*
-  TTextEdit = class
-    range: Range;
-    newText: string;
+  TTextEdit = class(TCustomJsonClass)
+  private
+    FRange: TRange;
+    function GetNewText: String;
+    procedure SetNewText(const Value: String);
+  protected
+    constructor Create(Json: TJSONObject); override;
+    constructor Create; override;
+
+    property Range: TRange read FRange;
+    property NewText: String read GetNewText write SetNewText;
   end;
 
+(*
   TChangeAnnotation = class
     label: string;
     needsConfirmation?: Boolean;
     description?: string;
   end;
 
-  type ChangeAnnotationIdentifier = string;
+  type TChangeAnnotationIdentifier = string;
 
   TAnnotatedTextEdit = class(TTextEdit)
-    annotationId: ChangeAnnotationIdentifier;
+    annotationId: TChangeAnnotationIdentifier;
   end;
 
   TTextDocumentEdit = class
@@ -310,7 +318,7 @@ type
     kind: 'create';
     uri: DocumentUri;
     options?: CreateFileOptions;
-    annotationId?: ChangeAnnotationIdentifier;
+    annotationId?: TChangeAnnotationIdentifier;
   end;
 
   TRenameFileOptions = class
@@ -323,7 +331,7 @@ type
     oldUri: DocumentUri;
     newUri: DocumentUri;
     options?: RenameFileOptions;
-    annotationId?: ChangeAnnotationIdentifier;
+    annotationId?: TChangeAnnotationIdentifier;
   end;
 
   TDeleteFileOptions = class
@@ -335,7 +343,7 @@ type
     kind: 'delete';
     uri: DocumentUri;
     options?: DeleteFileOptions;
-    annotationId?: ChangeAnnotationIdentifier;
+    annotationId?: TChangeAnnotationIdentifier;
   end;
 
   TWorkspaceEdit = class
@@ -348,7 +356,7 @@ type
     );
 
     changeAnnotations?: begin
-            [id: string (* ChangeAnnotationIdentifier * )]: ChangeAnnotation;
+            [id: string (* TChangeAnnotationIdentifier * )]: ChangeAnnotation;
       end;
   end;
 
@@ -420,20 +428,25 @@ type
   TTextDocumentRegistrationOptions = class
     documentSelector: DocumentSelector | null;
   end;
+*)
 
-{
-  namespace MarkupKind {
-    const PlainText: 'plaintext' = 'plaintext';
-    const Markdown: 'markdown' = 'markdown';
+  TMarkupKind = (mkPlainText, mkMarkDown);
+
+  TMarkupContent = class(TCustomJsonClass)
+  private
+    function GetKind: TMarkupKind;
+    function GetValue: String;
+    procedure SetKind(const Value: TMarkupKind);
+    procedure SetValue(const Value: String);
+  public
+    constructor Create; override;
+    constructor Create(Json: TJSONObject); override;
+
+    property Kind: TMarkupKind read GetKind write SetKind;
+    property Value: String read GetValue write SetValue;
   end;
-  type MarkupKind = 'plaintext' | 'markdown';
-}
 
-  TMarkupContent = class
-    kind: MarkupKind;
-    value: string;
-  end;
-
+(*
   TMarkdownClientCapabilities = class
     parser: string;
     version?: string;
@@ -2196,8 +2209,32 @@ type
   end;
 *)
 
+function MarkupKindToString(Value: TMarkupKind): String;
+function StringToMarkupKind(Value: String): TMarkupKind;
 
 implementation
+
+function MarkupKindToString(Value: TMarkupKind): String;
+begin
+  case Value of
+    mkPlainText:
+      Result := 'plaintext';
+    mkMarkDown:
+      Result := 'markdown';
+  end;
+end;
+
+function StringToMarkupKind(Value: String): TMarkupKind;
+begin
+  if Value ='plaintext' then
+    Result := mkPlainText
+  else
+  if Value ='markdown' then
+    Result := mkMarkDown
+  else
+    raise EJsonRpcParse.Create('Unknown markup kind');
+end;
+
 
 { TCustomJsonClass }
 
@@ -2751,6 +2788,69 @@ begin
 end;
 
 
+{ TTextEdit }
+
+constructor TTextEdit.Create;
+begin
+  inherited Create;
+
+  FRange := TRange.Create;
+  AddPair('range', FRange.Json);
+
+  NewText := '';
+end;
+
+constructor TTextEdit.Create(Json: TJSONObject);
+begin
+  inherited Create(Json);
+
+  FRange := TRange.Create(GetValue('range') as TJSONObject);
+end;
+
+function TTextEdit.GetNewText: String;
+begin
+  Result := GetText('newText');
+end;
+
+procedure TTextEdit.SetNewText(const Value: String);
+begin
+  SetPair('newText', Value);
+end;
+
+
+{ TMarkupContent }
+
+constructor TMarkupContent.Create;
+begin
+  inherited Create;
+end;
+
+constructor TMarkupContent.Create(Json: TJSONObject);
+begin
+  inherited Create(Json);
+end;
+
+function TMarkupContent.GetKind: TMarkupKind;
+begin
+  Result := StringToMarkupKind(GetText('kind'));
+end;
+
+function TMarkupContent.GetValue: String;
+begin
+  Result := GetText('value');
+end;
+
+procedure TMarkupContent.SetKind(const Value: TMarkupKind);
+begin
+  SetPair('kind', MarkupKindToString(Value));
+end;
+
+procedure TMarkupContent.SetValue(const Value: String);
+begin
+  SetPair('value', Value);
+end;
+
+
 { TWorkDoneProgress }
 
 function TWorkDoneProgress.GetMessage: string;
@@ -2921,6 +3021,8 @@ begin
     else
     if Value = 'verbose' then
       Result := tvVerbose
+    else
+      raise EJsonRpcParse.Create('Unknown trace value');
   end;
 end;
 

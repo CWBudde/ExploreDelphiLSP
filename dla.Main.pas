@@ -78,7 +78,7 @@ var
   Payload: Utf8String;
 begin
   Payload := Utf8String(MemoInput.Text);
-  Header := AnsiString('Content-Length: ' + IntToStr(Length(Payload)) + #13#10 + #13#10);
+  Header := AnsiString('Content-Length: ' + IntToStr(Length(Payload)) + #13#10#13#10);
   FPipedExecution.WriteText(Header);
   FPipedExecution.WriteText(Payload);
 end;
